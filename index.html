@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Mateo's Holiday Shop</title>
+<meta name="description" content="A tiny 3D holiday shop. Walk around, pick a gift, claim it so nobody doubles up.">
+<meta name="theme-color" content="#0f1a2b">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<!-- Shared claims live in Firebase when firebase-config.js is filled in; otherwise the site runs in local demo mode. -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<!-- Main menu / entry screen -->
+<div id="entry" class="overlay">
+  <div class="entry-card">
+    <div class="entry-badge">🎄 Christmas &amp; Hanukkah 2026 🕎</div>
+    <h1 id="entry-title">Mateo's Holiday Shop</h1>
+    <p id="entry-tagline">Walk around, find something, and tap “I've got this” so nobody doubles up.</p>
+    <ol class="steps">
+      <li><span>1</span>Walk into the little store (or open the list)</li>
+      <li><span>2</span>Tap a gift to see photos, size and the link to buy it</li>
+      <li><span>3</span>Tap <b>I've got this</b> and it's marked as taken for everyone</li>
+    </ol>
+    <p id="entry-stats" class="stats"></p>
+    <div class="entry-actions">
+      <button id="btn-enter" class="btn primary">🚶 Walk into the store</button>
+      <button id="btn-list" class="btn ghost">🎁 See the gift list</button>
+    </div>
+    <p class="entry-help" id="entry-help"></p>
+    <p id="mode-banner" class="mode-banner" hidden></p>
+  </div>
+</div>
+
+<!-- Heads-up display while walking -->
+<div id="hud" hidden>
+  <div id="crosshair"></div>
+  <div id="hint" class="hint"></div>
+  <div class="hud-top left"><button id="hud-menu" class="chip">☰ Menu</button></div>
+  <div class="hud-top"><button id="hud-list" class="chip">🎁 Gift list</button></div>
+  <div id="joystick" class="joystick" hidden><div class="knob"></div></div>
+  <div id="look-hint" class="look-hint" hidden>Drag to look · tap an item to open it</div>
+</div>
+
+<!-- Pause menu -->
+<div id="menu" class="overlay soft" hidden>
+  <div class="menu-card">
+    <h3>Paused</h3>
+    <button id="menu-resume" class="btn primary">▶ Keep shopping</button>
+    <button id="menu-list" class="btn ghost">🎁 Gift list</button>
+    <button id="menu-howto" class="btn ghost">❔ How to move</button>
+    <div id="howto" class="howto-box" hidden>
+      <p><b>Laptop:</b> arrow keys walk and turn (W A S D also work). Move the mouse to look around, click any gift to walk up to it and open it. <b>Esc</b> opens this menu.</p>
+      <p><b>Phone:</b> joystick (bottom left) walks, drag anywhere else to look, tap a gift to open it.</p>
+    </div>
+    <button id="menu-home" class="btn ghost">🏁 Back to the entrance</button>
+    <button id="menu-exit" class="btn ghost">⏏ Main menu</button>
+  </div>
+</div>
+
+<!-- Product panel -->
+<aside id="panel" class="panel" hidden>
+  <button id="panel-close" class="close" aria-label="Close">×</button>
+  <div class="gallery">
+    <img id="panel-img" alt="">
+    <div id="panel-thumbs" class="thumbs"></div>
+  </div>
+  <div class="panel-body">
+    <div class="brand" id="panel-brand"></div>
+    <h2 id="panel-name"></h2>
+    <div class="price-row"><span class="price" id="panel-price"></span><span class="status" id="panel-status"></span></div>
+    <p class="variant" id="panel-variant"></p>
+    <p class="blurb" id="panel-blurb"></p>
+    <p class="howto" id="panel-howto"></p>
+    <p class="pricenote" id="panel-pricenote"></p>
+    <div id="panel-claims" class="claims"></div>
+    <div class="actions">
+      <button id="btn-claim" class="btn primary">🎁 I've got this</button>
+      <a id="btn-buy" class="btn ghost" target="_blank" rel="noopener">Open the store page ↗</a>
+    </div>
+    <div id="claim-form" class="claim-form" hidden>
+      <label>Your name <input id="claim-name" maxlength="30" placeholder="e.g. Dad"></label>
+      <label>Note (optional) <input id="claim-note" maxlength="80" placeholder="e.g. ordering this week"></label>
+      <div class="row">
+        <button id="claim-confirm" class="btn primary">Confirm, it's mine to get</button>
+        <button id="claim-cancel" class="btn ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- List view -->
+<section id="list" class="listview" hidden>
+  <header>
+    <h2>Gift list</h2>
+    <div class="row">
+      <button id="list-walk" class="btn ghost small">🚶 Walk the store</button>
+      <button id="list-close" class="close" aria-label="Close">×</button>
+    </div>
+  </header>
+  <div id="list-grid" class="grid"></div>
+  <div class="feed"><h3>Recent activity</h3><ul id="feed"></ul></div>
+</section>
+
+<div id="toasts" class="toasts"></div>
+
+
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
